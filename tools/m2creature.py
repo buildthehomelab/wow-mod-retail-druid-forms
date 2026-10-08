@@ -210,7 +210,7 @@ class Converter:
             out = []
             for k in range(tsn):
                 n, off = struct.unpack_from("<II", md, tso + 8 * k)
-                vn2, voff = struct.unpack_from("<II", md, vo + 8 * k)
+                vn2, voff = struct.unpack_from("<II", md, vo + 8 * k) if value_size else (n, 0)
                 out.append((list(struct.unpack_from("<%dI" % n, md, off)),
                             md[voff:voff + value_size * vn2]))
             return (interp, gseq, out)
@@ -222,8 +222,8 @@ class Converter:
                 out.append(([], b""))
                 continue
             n, off = struct.unpack_from("<II", md, tso + 8 * src)
-            vn2, voff = struct.unpack_from("<II", md, vo + 8 * src)
-            if n != vn2 and value_size:
+            vn2, voff = struct.unpack_from("<II", md, vo + 8 * src) if value_size else (n, 0)
+            if n != vn2:
                 raise ValueError("%s: track with %d times and %d values" % (self.name, n, vn2))
             if n and (off + 4 * n > len(buf) or voff + value_size * n > len(buf)):
                 out.append(([], b""))  # a non-bone track the stale .anim doesn't cover

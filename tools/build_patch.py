@@ -322,6 +322,11 @@ def sql_str(s):
     return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
+def si(v):
+    """A DBC uint32 as the signed int the server's *_dbc columns hold (-1, not 4294967295)."""
+    return struct.unpack("<i", struct.pack("<I", v))[0]
+
+
 def fl(v):
     return "%g" % struct.unpack("<f", struct.pack("<I", v))[0]
 
@@ -344,8 +349,8 @@ def write_sql(path, rows, new_cdi, new_cmd):
         f.write("-- Preview creatures %d-%d: never spawned.\n" % (PREVIEW_CREATURE_BASE, last))
         f.write("DELETE FROM `creature_template_model` WHERE `CreatureID` BETWEEN %d AND %d;\n" % (PREVIEW_CREATURE_BASE, last))
         f.write("DELETE FROM `creature_template` WHERE `entry` BETWEEN %d AND %d;\n" % (PREVIEW_CREATURE_BASE, last))
-        f.write("INSERT INTO `creature_template` (`entry`, `name`, `subname`, `minlevel`, `maxlevel`, `faction`, `type`) VALUES\n")
-        f.write(",\n".join("(%d, %s, 'Druid Form', 1, 1, 35, 1)" % (e, sql_str(n)) for e, _d, n in previews) + ";\n")
+        f.write("INSERT INTO `creature_template` (`entry`, `name`, `subname`, `minlevel`, `maxlevel`, `faction`, `type`, `unit_class`) VALUES\n")
+        f.write(",\n".join("(%d, %s, 'Druid Form', 1, 1, 35, 1, 1)" % (e, sql_str(n)) for e, _d, n in previews) + ";\n")
         f.write("INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`) VALUES\n")
         f.write(",\n".join("(%d, 0, %d, 1, 1)" % (e, d) for e, d, _n in previews) + ";\n\n")
 
@@ -355,14 +360,14 @@ def write_sql(path, rows, new_cdi, new_cmd):
         f.write("DELETE FROM `creaturedisplayinfo_dbc` WHERE `ID` BETWEEN %d AND %d;\n" % (min(ids), max(ids)))
         f.write("INSERT INTO `creaturedisplayinfo_dbc` (`ID`, `ModelID`, `SoundID`, `ExtendedDisplayInfoID`, `CreatureModelScale`, `CreatureModelAlpha`, `TextureVariation_1`, `TextureVariation_2`, `TextureVariation_3`, `PortraitTextureName`, `BloodLevel`, `BloodID`, `NPCSoundID`, `ParticleColorID`, `CreatureGeosetData`, `ObjectEffectPackageID`) VALUES\n")
         f.write(",\n".join("(%d, %d, %d, %d, %s, %d, %s, %s, %s, '', %d, %d, %d, %d, %d, %d)" % (
-            r[0], r[1], r[2], r[3], fl(r[4]), r[5], sql_str(t[0]), sql_str(t[1]), sql_str(t[2]),
-            r[10], r[11], r[12], r[13], r[14], r[15]) for r, t in new_cdi) + ";\n")
+            r[0], si(r[1]), si(r[2]), si(r[3]), fl(r[4]), si(r[5]), sql_str(t[0]), sql_str(t[1]), sql_str(t[2]),
+            si(r[10]), si(r[11]), si(r[12]), si(r[13]), si(r[14]), si(r[15])) for r, t in new_cdi) + ";\n")
         mids = [r[0] for r, _n in new_cmd]
         f.write("DELETE FROM `creaturemodeldata_dbc` WHERE `ID` BETWEEN %d AND %d;\n" % (min(mids), max(mids)))
         f.write("INSERT INTO `creaturemodeldata_dbc` (`ID`, `Flags`, `ModelName`, `SizeClass`, `ModelScale`, `BloodID`, `FootprintTextureID`, `FootprintTextureLength`, `FootprintTextureWidth`, `FootprintParticleScale`, `FoleyMaterialID`, `FootstepShakeSize`, `DeathThudShakeSize`, `SoundID`, `CollisionWidth`, `CollisionHeight`, `MountHeight`, `GeoBoxMinX`, `GeoBoxMinY`, `GeoBoxMinZ`, `GeoBoxMaxX`, `GeoBoxMaxY`, `GeoBoxMaxZ`, `WorldEffectScale`, `AttachedEffectScale`, `MissileCollisionRadius`, `MissileCollisionPush`, `MissileCollisionRaise`) VALUES\n")
         f.write(",\n".join("(%d, %d, %s, %d, %s, %d, %d, %s, %s, %s, %d, %d, %d, %d, %s)" % (
-            r[0], r[1], sql_str(n), r[3], fl(r[4]), r[5], r[6], fl(r[7]), fl(r[8]), fl(r[9]), r[10], r[11], r[12],
-            r[13], ", ".join(fl(x) for x in r[14:28])) for r, n in new_cmd) + ";\n")
+            r[0], si(r[1]), sql_str(n), si(r[3]), fl(r[4]), si(r[5]), si(r[6]), fl(r[7]), fl(r[8]), fl(r[9]),
+            si(r[10]), si(r[11]), si(r[12]), si(r[13]), ", ".join(fl(x) for x in r[14:28])) for r, n in new_cmd) + ";\n")
         f.write("DELETE FROM `creature_model_info` WHERE `DisplayID` BETWEEN %d AND %d;\n" % (min(ids), max(ids)))
         f.write("INSERT INTO `creature_model_info` (`DisplayID`, `BoundingRadius`, `CombatReach`, `Gender`, `DisplayID_Other_Gender`) VALUES\n")
         f.write(",\n".join("(%d, 1, 1.5, 2, 0)" % d for d in ids) + ";\n")
