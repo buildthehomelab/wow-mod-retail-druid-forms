@@ -88,10 +88,21 @@ python3 tools/inventory.py --cache ~/forms-cache
 python3 tools/build_patch.py --dbc <dbc dir> --cache ~/forms-cache --work ~/forms-work --out patch-I.MPQ --sql forms_data.sql
 ```
 
-`--dbc` needs `CreatureDisplayInfo.dbc`, `CreatureModelData.dbc` and `AnimationData.dbc`. Use the
-copies your players already have. A patch replaces whole files, so if another patch your players
-use ships these DBCs (an HD creature pack, say), build from that patch's copies, or its creatures
-lose their textures.
+`--dbc` needs `CreatureDisplayInfo.dbc`, `CreatureModelData.dbc` and `AnimationData.dbc`: the
+client's stock copies (the server has them in `env/dist/data/dbc`).
+
+### HD creature packs
+
+A patch replaces whole files. An HD creature pack ships its own `CreatureDisplayInfo.dbc` and
+`CreatureModelData.dbc`, and patch-I loads after it, so the pack's creatures lose textures (white
+armour on HD kodos, for one). A player with such a pack adds a small patch that loads after
+patch-I and carries the pack's DBCs plus the form rows:
+
+```bash
+python3 tools/build_patch.py --dbc <the pack's DBCs + AnimationData.dbc> --cache ~/forms-cache --work ~/forms-work-hd --out patch-J.MPQ --dbc-only
+```
+
+Take the DBCs from the pack's last patch (the highest letter that has them).
 
 ## Requirements
 

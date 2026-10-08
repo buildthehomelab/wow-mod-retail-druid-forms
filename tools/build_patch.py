@@ -153,6 +153,10 @@ def main():
     ap.add_argument("--sql")
     ap.add_argument("--max-texture", type=int, default=1024)
     ap.add_argument("--only", help="comma-separated display ids (test builds)")
+    ap.add_argument("--dbc-only", action="store_true",
+                    help="pack only the two DBCs: a small patch that loads after patch-I for clients "
+                         "whose own patch (an HD creature pack) ships these DBCs; build it from that "
+                         "patch's copies with --dbc")
     args = ap.parse_args()
     os.makedirs(args.work, exist_ok=True)
 
@@ -303,6 +307,8 @@ def main():
     write_dbc(os.path.join(args.work, "CreatureModelData.dbc"), cmd_rows, cmd_str, cmd_fields)
     files["DBFilesClient\\CreatureDisplayInfo.dbc"] = ("file", os.path.join(args.work, "CreatureDisplayInfo.dbc"))
     files["DBFilesClient\\CreatureModelData.dbc"] = ("file", os.path.join(args.work, "CreatureModelData.dbc"))
+    if args.dbc_only:
+        files = {n: f for n, f in files.items() if n.startswith("DBFilesClient\\")}
     pack(args.out, [(src, name) for name, (_k, src) in sorted(files.items())])
     print("%s: %d looks, %d models, %d files, %.1f MB" % (
         args.out, len(looks), len(variants), len(files), os.path.getsize(args.out) / 1e6))
