@@ -110,6 +110,37 @@ Take the DBCs from the pack's last patch (the highest letter that has them).
 - [StormLib](https://github.com/ladislav-zezula/StormLib) as a shared library. The default is
   `/usr/local/lib/libstorm.dylib`; point `STORMLIB` at yours.
 
+## Troubleshooting
+
+- **A druid shows as nothing, or a white model**: that client lacks patch-I, or an HD creature
+  pack loads after it. Build the small `--dbc-only` patch above for that client.
+- **White armour on other creatures after adding patch-I**: same cause; the HD pack's DBCs were
+  replaced. Use the `--dbc-only` patch.
+- **wago.tools answers 502/504**: the fetcher retries; rerun if it still gives up. Downloads are
+  cached in `--cache`.
+
+## Credits
+
+- Model and table data: Blizzard Entertainment, downloaded at build time from
+  [wago.tools](https://wago.tools); file names from the
+  [wowdev community listfile](https://github.com/wowdev/wow-listfile).
+- M2 format notes: [wowdev.wiki](https://wowdev.wiki/M2) and
+  [whoa](https://github.com/thunderbrewhq/whoa).
+
+## Patch Notes: Druid Form Looks
+
+Category: Classes / Druid
+
+- Druids can now choose from 265 looks for their shapeshift forms, from the new Forms tab of the
+  Transmogrify window (`/transmog`).
+- Every form has looks: bear, cat, travel, aquatic, flight, moonkin and Tree of Life.
+- The classic looks, remade in HD, are yours from the start. Every raid tier you clear unlocks a
+  new batch, from the Zandalari forms in Zul'Gurub to the Batbear in the Ruby Sanctum.
+- Previews show each look; locked ones show as a silhouette and tell you where they unlock.
+
+> These are retail's own form models, converted with their animations. Particle effects don't
+> survive the trip, so the artifact forms glow a little less than on retail.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
