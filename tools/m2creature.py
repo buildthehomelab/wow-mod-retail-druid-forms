@@ -402,7 +402,6 @@ class Converter:
 
     def convert_skin(self):
         sk = self.skin
-        mats = self.m.arr("materials", "<HH")
         out = bytearray(48)
 
         def add(payload, count):

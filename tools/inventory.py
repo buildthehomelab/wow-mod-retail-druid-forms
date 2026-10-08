@@ -134,7 +134,6 @@ def main():
     cdi = db2(args.cache, "CreatureDisplayInfo")
     cmd = db2(args.cache, "CreatureModelData")
     choice = db2(args.cache, "ChrCustomizationChoice")
-    option = db2(args.cache, "ChrCustomizationOption")
     geo = collections.defaultdict(list)
     for g in db2_rows(args.cache, "CreatureDisplayInfoGeosetData"):
         geo[g["CreatureDisplayInfoID"]].append((int(g["GeosetIndex"]), int(g["GeosetValue"])))

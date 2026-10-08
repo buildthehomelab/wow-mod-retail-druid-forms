@@ -23,7 +23,7 @@ import struct
 import sys
 
 from check_m2 import check
-from fetch import casc, casc_path, db2, db2_rows, listfile
+from fetch import casc, db2, db2_rows
 from m2creature import Converter, Retail
 
 HERE = os.path.dirname(os.path.abspath(__file__))
