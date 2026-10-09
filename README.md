@@ -70,7 +70,7 @@ To move a batch, change its line in `TIERS` in `tools/inventory.py` and rerun it
     another animation.
 - `tools/check_m2.py` checks a converted model the way the client reads it.
 - `tools/build_patch.py` downloads everything, converts each model once per geoset combination,
-  and writes `patch-I.MPQ`. It also writes the mod-transmog-plus SQL: the looks, one preview
+  and writes `patch-R.MPQ`. It also writes the mod-transmog-plus SQL: the looks, one preview
   creature per look, and the server copies of the new display rows.
   - New CreatureDisplayInfo rows are 95000+, and CreatureModelData rows are 9500+.
   - The models are under `Creature\RetailForms`.
@@ -85,24 +85,32 @@ python3 tools/inventory.py --cache ~/forms-cache
 ```
 
 ```bash
-python3 tools/build_patch.py --dbc <dbc dir> --cache ~/forms-cache --work ~/forms-work --out patch-I.MPQ --sql forms_data.sql
+python3 tools/build_patch.py --dbc <dbc dir> --cache ~/forms-cache --work ~/forms-work --out patch-R.MPQ --sql forms_data.sql
 ```
 
-`--dbc` needs `CreatureDisplayInfo.dbc`, `CreatureModelData.dbc` and `AnimationData.dbc`: the
-client's stock copies (the server has them in `env/dist/data/dbc`).
+`--dbc` needs `CreatureDisplayInfo.dbc`, `CreatureModelData.dbc` and `AnimationData.dbc` as the
+players' client has them: the copies from the last patch in its load order that ships each one. On
+the realm's base client (TheraWoW with Project Reforged HD) that's Reforged's `patch-C.mpq` for the
+two creature DBCs and the stock `AnimationData.dbc` (`Data/enUS/patch-enUS-3.MPQ`). Model ids the base
+already uses (Reforged has 9511 and 9571) move past the 9500 block, to 9590 and 9591.
 
 ### HD creature packs
 
 A patch replaces whole files. An HD creature pack ships its own `CreatureDisplayInfo.dbc` and
-`CreatureModelData.dbc`, and patch-I loads after it, so the pack's creatures lose textures (white
-armour on HD kodos, for one). A player with such a pack adds a small patch that loads after
-patch-I and carries the pack's DBCs plus the form rows:
+`CreatureModelData.dbc`, so the form patch has to carry the pack's rows too: build it with `--dbc`
+pointing at the pack's copies, and give it a letter that loads after the pack's (patch-R loads after
+Reforged's patch-C). Built on the wrong DBCs, the pack's creatures lose their textures (white armour
+on HD kodos, for one).
+
+When the base client changes, the finished patch can also be moved onto it without downloading the
+models again: `tools/client-patches/rebase_patch.py` in the realm's server repo merges the DBCs
+(`--renumber CreatureModelData:CreatureDisplayInfo.1` gives clashing models the same new ids as above).
+A client whose own HD pack isn't the realm's can still use a small DBC-only patch that loads after
+patch-R:
 
 ```bash
-python3 tools/build_patch.py --dbc <the pack's DBCs + AnimationData.dbc> --cache ~/forms-cache --work ~/forms-work-hd --out patch-J.MPQ --dbc-only
+python3 tools/build_patch.py --dbc <the pack's DBCs + AnimationData.dbc> --cache ~/forms-cache --work ~/forms-work-hd --out patch-Y.MPQ --dbc-only
 ```
-
-Take the DBCs from the pack's last patch (the highest letter that has them).
 
 ## Requirements
 
@@ -112,9 +120,9 @@ Take the DBCs from the pack's last patch (the highest letter that has them).
 
 ## Troubleshooting
 
-- **A druid shows as nothing, or a white model**: that client lacks patch-I, or an HD creature
+- **A druid shows as nothing, or a white model**: that client lacks patch-R, or an HD creature
   pack loads after it. Build the small `--dbc-only` patch above for that client.
-- **White armour on other creatures after adding patch-I**: same cause; the HD pack's DBCs were
+- **White armour on other creatures after adding patch-R**: same cause; the HD pack's DBCs were
   replaced. Use the `--dbc-only` patch.
 - **wago.tools answers 502/504**: the fetcher retries; rerun if it still gives up. Downloads are
   cached in `--cache`.
