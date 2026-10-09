@@ -136,6 +136,8 @@ def check(m2, skin):
         errors.append("skin index past the vertex map")
     subs = [struct.unpack_from("<HHHHHHHHHH3f3ff", skin, a[3][1] + 48 * i) for i in range(a[3][0])]
     for i, s in enumerate(subs):
+        if s[6] > 64:
+            errors.append("submesh %d: %d bones in its palette (3.3.5 GPU skinning crashes past ~75)" % (i, s[6]))
         if s[1] or s[2] + s[3] > len(vmap) or s[4] + s[5] > len(idx) or s[7] + s[6] > len(bl):
             errors.append("submesh %d out of range %s" % (i, s[:8]))
     for i in range(a[4][0]):

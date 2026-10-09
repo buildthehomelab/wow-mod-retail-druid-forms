@@ -29,6 +29,7 @@ ARRAYS = [  # header M2Arrays after magic/version, in file order ('u' = plain ui
 SEQUENCE = "<HHIfIhHIIHH6ffhH"  # retail: blendTimeIn/Out as two uint16
 TRACK = "<HhIIII"
 TRACK_SIZE = 20
+MAX_PALETTE = 64  # bones per submesh the 3.3.5 GPU skinning takes (see split_submeshes)
 
 
 def chunks(data):
@@ -330,7 +331,9 @@ class Converter:
         mats = m.arr("materials", "<HH")
         h["materials"] = b.add(b"".join(struct.pack("<HH", f & materials_mask, bl if bl <= 6 else 4)
                                         for f, bl in mats), len(mats))
-        h["bone_lookup"] = self.copy("bone_lookup", 2)
+        skin, extra_lookup = self.convert_skin()
+        lookup = [x[0] for x in m.arr("bone_lookup", "<H")] + extra_lookup
+        h["bone_lookup"] = b.add(struct.pack("<%dH" % len(lookup), *lookup), len(lookup))
         h["texture_lookup"] = self.copy("texture_lookup", 2)
         h["texunit_lookup"] = b.add(struct.pack("<h", 0), 1)
         h["weight_lookup"] = self.copy("weight_lookup", 2)
@@ -356,7 +359,7 @@ class Converter:
                 hdr += struct.pack("<" + kind, *(m.h[key] if isinstance(m.h[key], tuple) else (m.h[key],)))
         assert len(hdr) == HEADER_SIZE, hex(len(hdr))
         b.data[:HEADER_SIZE] = hdr
-        return bytes(b.data), self.convert_skin()
+        return bytes(b.data), skin
 
     def events(self):
         """Only events that need no retail sound id ($FS* footsteps etc. carry data 0)."""
@@ -400,8 +403,89 @@ class Converter:
         group, variant = divmod(submesh_id, 100)
         return group == 0 or variant == self.geosets.get(group, 1)
 
-    def convert_skin(self):
+    def drawn_batches(self):
+        """Retail batches 3.3.5 can draw: first texture pass, shown geosets, known textures."""
         sk = self.skin
+        tex_lookup = self.m.arr("texture_lookup", "<h")
+        out = []
+        for bt in sk.batches:
+            sub, layer, tex_combo = bt[3], bt[7], bt[9]
+            if layer != 0:
+                continue  # retail extra passes (env/glow)
+            if not self.shows(sk.submeshes[sub][0]):
+                continue
+            if tex_lookup[tex_combo][0] in self.skipped_textures:
+                continue
+            out.append(bt)
+        return out
+
+    def split_submeshes(self, batches):
+        """Rebuilds the skin's vertex map, indices and submeshes with only the submeshes those
+        batches draw (hidden geosets and dropped passes go), and keeps every submesh's bone
+        palette within MAX_PALETTE: 3.3.5 skins a submesh on the GPU with one palette, and the
+        client's vertex shader holds about 75 bones. A bigger palette draws as streaks and
+        crashes the client (seen on the 76-bone Haranir stag); retail palettes run past 160. Such
+        a submesh is cut into pieces of whole triangles, each with its own palette.
+        Returns (vertex map, indices, per-vertex palette indices, submeshes,
+        {old submesh: [new submeshes]}, extra bone lookup entries)."""
+        sk = self.skin
+        lookup = [x[0] for x in self.m.arr("bone_lookup", "<H")]
+        verts = self.m.arr("vertices", "<12x4B4B28x")
+        vmap, idx, bones, subs, extra, sub_map = [], [], bytearray(), [], [], {}
+        for si in sorted({bt[3] for bt in batches}):
+            sub = sk.submeshes[si]
+            if sub[1]:
+                raise ValueError("%s: submesh Level %d not supported" % (self.name, sub[1]))
+            tris = [sk.indices[sub[4] + 3 * t:sub[4] + 3 * t + 3] for t in range(sub[5] // 3)]
+            if sub[6] <= MAX_PALETTE:
+                groups = [(tris, None)]
+            else:
+                groups, cur, cur_set = [], [], set()
+                for tri in tris:
+                    tb = set()
+                    for v in tri:
+                        w, g = verts[sk.vmap[v]][:4], verts[sk.vmap[v]][4:]
+                        tb.update(g[k] for k in range(4) if w[k])
+                    if cur and len(cur_set | tb) > MAX_PALETTE:
+                        groups.append((cur, cur_set))
+                        cur, cur_set = [], set()
+                    cur.append(tri)
+                    cur_set |= tb
+                if cur:
+                    groups.append((cur, cur_set))
+            sub_map[si] = []
+            for tris_g, used in groups:
+                piece = list(sub)
+                if used is None:
+                    pos = None
+                else:
+                    palette = sorted(used)
+                    pos = {bone: i for i, bone in enumerate(palette)}
+                    piece[6], piece[7] = len(palette), len(lookup) + len(extra)
+                    extra.extend(palette)
+                remap, vstart = {}, len(vmap)
+                for tri in tris_g:
+                    for v in tri:
+                        if v in remap:
+                            continue
+                        remap[v] = len(vmap)
+                        vmap.append(sk.vmap[v])
+                        if pos is None:
+                            bones += sk.bones[4 * v:4 * v + 4]
+                        else:
+                            w, g = verts[sk.vmap[v]][:4], verts[sk.vmap[v]][4:]
+                            bones += bytes(pos[g[k]] if w[k] else 0 for k in range(4))
+                piece[2], piece[3] = vstart, len(remap)
+                piece[4], piece[5] = len(idx), 3 * len(tris_g)
+                idx.extend(remap[v] for tri in tris_g for v in tri)
+                subs.append(piece)
+                sub_map[si].append(len(subs) - 1)
+        if len(vmap) > 0xFFFF or len(idx) > 0xFFFF:
+            raise ValueError("%s: the skin overflows 16 bits (%d vertices, %d indices)"
+                             % (self.name, len(vmap), len(idx)))
+        return vmap, idx, bytes(bones), subs, sub_map, extra
+
+    def convert_skin(self):
         out = bytearray(48)
 
         def add(payload, count):
@@ -411,31 +495,23 @@ class Converter:
             out.extend(payload)
             return (count, off) if count else (0, 0)
 
-        parts = [add(struct.pack("<%dH" % len(sk.vmap), *sk.vmap), len(sk.vmap)),
-                 add(struct.pack("<%dH" % len(sk.indices), *sk.indices), len(sk.indices)),
-                 add(sk.bones, len(sk.vmap))]
-        subs = b""
-        for x in sk.submeshes:
-            if x[1]:
-                raise ValueError("%s: submesh Level %d not supported" % (self.name, x[1]))
-            subs += struct.pack("<HHHHHHHHHH3f3ff", *x)
-        parts.append(add(subs, len(sk.submeshes)))
+        drawn = self.drawn_batches()
+        vmap, idx, vbones, submeshes, sub_map, extra = self.split_submeshes(drawn)
+        parts = [add(struct.pack("<%dH" % len(vmap), *vmap), len(vmap)),
+                 add(struct.pack("<%dH" % len(idx), *idx), len(idx)),
+                 add(vbones, len(vmap))]
+        subs = b"".join(struct.pack("<HHHHHHHHHH3f3ff", *x) for x in submeshes)
+        parts.append(add(subs, len(submeshes)))
         batches = b""
         nb = 0
-        for bt in sk.batches:
+        for bt in drawn:
             (flags, prio, shader, sub, geoset, color, mat, layer, count, tex_combo,
              uv_combo, weight_combo, transform_combo) = bt
-            if layer != 0:
-                continue  # retail extra passes (env/glow)
-            if not self.shows(sk.submeshes[sub][0]):
-                continue
-            tex_lookup = self.m.arr("texture_lookup", "<h")
-            if tex_lookup[tex_combo][0] in self.skipped_textures:
-                continue
-            batches += struct.pack("<BbHHHhHHHHHHH", flags, prio, 0, sub, geoset, color, mat, 0, 1,
-                                   tex_combo, 0, weight_combo, transform_combo)
-            nb += 1
+            for piece in sub_map[sub]:
+                batches += struct.pack("<BbHHHhHHHHHHH", flags, prio, 0, piece, piece, color, mat, 0, 1,
+                                       tex_combo, 0, weight_combo, transform_combo)
+                nb += 1
         parts.append(add(batches, nb))
-        max_bones = max([x[6] for x in sk.submeshes] + [21])
+        max_bones = max([x[6] for x in submeshes] + [21])
         out[:48] = b"SKIN" + b"".join(struct.pack("<II", *p) for p in parts) + struct.pack("<I", max_bones)
-        return bytes(out)
+        return bytes(out), extra
