@@ -86,6 +86,12 @@ def check(m2, skin):
     for i in range(h["colors"][0]):
         track("color %d" % i, h["colors"][1] + 40 * i, 12)
         track("alpha %d" % i, h["colors"][1] + 40 * i + 20, 2)
+        # A colour track's sequence without keys is black in this client (alpha's is opaque).
+        interp, gseq, tn, to = struct.unpack_from("<HhII", m2, h["colors"][1] + 40 * i)
+        if gseq == -1 and tn:
+            empty = [k for k in range(tn) if not struct.unpack_from("<I", m2, to + 8 * k)[0]]
+            if empty:
+                errors.append("color %d: no key in sequence %s (draws black)" % (i, empty[:5]))
     for i in range(h["texture_weights"][0]):
         track("weight %d" % i, h["texture_weights"][1] + 20 * i, 2)
     for i in range(h["attachments"][0]):
