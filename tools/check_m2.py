@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sanity-check a 3.3.5a (MD20 v264) model + skin the way the client reads them: every array
 inside the file, every animated track with one sub-array per sequence, keyframes sorted and
-inside their sequence, skin indexes in range.
+inside their sequence, skin indexes in range, a bounding box that fits the mesh.
 
     python3 check_m2.py model.m2 model00.skin
 """
@@ -135,6 +135,16 @@ def check(m2, skin):
     if any(x >= len(vmap) for x in idx):
         errors.append("skin index past the vertex map")
     subs = [struct.unpack_from("<HHHHHHHHHH3f3ff", skin, a[3][1] + 48 * i) for i in range(a[3][0])]
+    # A 3.3.5 model frame seems to size a creature by its box: far past the mesh (the client's
+    # own models stay within the mesh's size), the look is a speck.
+    pts = [struct.unpack_from("<3f", m2, h["vertices"][1] + 48 * v) for v in set(vmap) if v < nverts]
+    if pts:
+        box = struct.unpack_from("<6f", m2, 0xA0)
+        lo = [min(p[k] for p in pts) for k in range(3)]
+        hi = [max(p[k] for p in pts) for k in range(3)]
+        size = max(hi[k] - lo[k] for k in range(3))
+        if any(lo[k] - box[k] > size or box[3 + k] - hi[k] > size for k in range(3)):
+            errors.append("bounding box reaches more than the mesh's size past the mesh")
     for i, s in enumerate(subs):
         if s[6] > 64:
             errors.append("submesh %d: %d bones in its palette (3.3.5 GPU skinning crashes past ~75)" % (i, s[6]))

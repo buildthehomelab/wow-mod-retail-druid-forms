@@ -99,6 +99,10 @@ change its phase there and rerun it.
   - Some retail `.anim` files no longer match their model (left over from an older version).
     Those animations (mostly sit, sleep and emotes) are dropped, and the client falls back to
     another animation.
+  - A bounding box far bigger than the mesh is pulled in to it. Retail's covers every animation
+    (the goblin fire totem's box is 26 yards tall, because its rocket takes off when it dies),
+    and a 3.3.5 model frame seems to size a creature by that box: such a look previewed as a
+    speck.
 - `tools/totem_inventory.py` writes `data/totems.tsv` from its list of totem sets, with the
   same rule: ids already in the file never move.
 - `tools/check_m2.py` checks a converted model the way the client reads it.
@@ -173,6 +177,8 @@ python3 tools/build_patch.py --dbc <the pack's DBCs + AnimationData.dbc> --cache
   pack loads after it. Build the small `--dbc-only` patch above for that client.
 - **Druid forms vanish after adding patch-V**: it was built on DBCs without the form rows. Build
   it with `--dbc` from patch-R.
+- **A look's preview tile is empty, or the look is tiny in a model frame**: its bounding box is
+  far bigger than its mesh. The converter fits the box now; rebuild the patch.
 - **A retail totem has no flames, drips or sparks**: those are particle effects, which the
   converter drops. The mesh glows and scrolling effects stay. The client's own five race sets
   keep everything.

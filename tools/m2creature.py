@@ -30,6 +30,7 @@ SEQUENCE = "<HHIfIhHIIHH6ffhH"  # retail: blendTimeIn/Out as two uint16
 TRACK = "<HhIIII"
 TRACK_SIZE = 20
 MAX_PALETTE = 64  # bones per submesh the 3.3.5 GPU skinning takes (see split_submeshes)
+BOUNDS_LIMIT, BOUNDS_SLACK = 1.0, 0.5  # the model's box against its drawn mesh (see fit_bounds)
 
 
 def chunks(data):
@@ -360,6 +361,7 @@ class Converter:
         h["cameras"] = self.cameras()
         h["camera_lookup"] = self.copy("camera_lookup", 2)
 
+        bounds = self.fit_bounds()
         hdr = bytearray(b"MD20" + struct.pack("<I", 264))
         for key, kind in ARRAYS:
             if kind == "a":
@@ -368,11 +370,44 @@ class Converter:
                 hdr += struct.pack("<I", m.h[key] & 0x7)
             elif key == "num_skins":
                 hdr += struct.pack("<I", 1)
+            elif key in bounds:
+                hdr += struct.pack("<" + kind, *bounds[key])
             else:
                 hdr += struct.pack("<" + kind, *(m.h[key] if isinstance(m.h[key], tuple) else (m.h[key],)))
         assert len(hdr) == HEADER_SIZE, hex(len(hdr))
         b.data[:HEADER_SIZE] = hdr
         return bytes(b.data), skin
+
+    def fit_bounds(self):
+        """The model's box and radius, with the sides that stray far from the drawn mesh pulled in.
+        Retail's box covers every animation: a goblin fire totem is 3 yards tall and its box 26,
+        because its death animation launches the rocket, and some flight forms reach 200 yards.
+        A 3.3.5 model frame seems to size a creature by this box: that totem's preview tile was
+        empty. The 3.3.5 client's own models keep each side within the mesh's largest dimension
+        of the mesh, so a side further out than that (BOUNDS_LIMIT) comes in to half of it
+        (BOUNDS_SLACK), and the radius shrinks with the box. Each animation keeps its own
+        bounds."""
+        box, radius = self.m.h["bbox"], self.m.h["bradius"][0]
+        verts = self.m.arr("vertices", "<3f36x")
+        pts = [verts[v] for v in self.drawn_vertices]
+        if not pts:
+            return {}
+        lo = [min(p[k] for p in pts) for k in range(3)]
+        hi = [max(p[k] for p in pts) for k in range(3)]
+        size = max(hi[k] - lo[k] for k in range(3))
+        new = list(box)
+        for k in range(3):
+            if lo[k] - box[k] > BOUNDS_LIMIT * size:
+                new[k] = lo[k] - BOUNDS_SLACK * size
+            if box[3 + k] - hi[k] > BOUNDS_LIMIT * size:
+                new[3 + k] = hi[k] + BOUNDS_SLACK * size
+
+        def diagonal(b):
+            return sum((b[3 + k] - b[k]) ** 2 for k in range(3)) ** 0.5
+
+        if diagonal(box) > 0:
+            radius *= diagonal(new) / diagonal(box)
+        return {"bbox": new, "bradius": (radius,)}
 
     def events(self):
         """Only events that need no retail sound id ($FS* footsteps etc. carry data 0)."""
@@ -534,6 +569,7 @@ class Converter:
 
         drawn = self.drawn_batches()
         vmap, idx, vbones, submeshes, sub_map, extra = self.split_submeshes(drawn)
+        self.drawn_vertices = set(vmap)
         parts = [add(struct.pack("<%dH" % len(vmap), *vmap), len(vmap)),
                  add(struct.pack("<%dH" % len(idx), *idx), len(idx)),
                  add(vbones, len(vmap))]
