@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
-"""Build patch-R.MPQ: every look in data/looks.tsv as a 3.3.5a creature display.
+"""Build a client patch: every look in a pack's data file as a 3.3.5a creature display.
 
     python3 build_patch.py --dbc <dir> --cache <download dir> --work <dir> --out patch-R.MPQ \\
-        [--sql forms.sql] [--max-texture 1024]
+        [--pack forms|totems] [--sql forms.sql] [--max-texture 1024]
+
+--pack picks what to build: the druid form looks (data/looks.tsv, patch-R) or the shaman totem
+looks (data/totems.tsv, patch-V).
 
 --dbc holds the CreatureDisplayInfo.dbc, CreatureModelData.dbc and AnimationData.dbc the realm's
 players already have. A patch MPQ replaces whole files, so if another patch the players use ships
-those DBCs (an HD creature pack, say), pass its copies, or its creatures lose their textures.
+those DBCs (an HD creature pack, the other pack's patch), pass its copies, or its creatures lose
+their textures.
 
 Each retail model is downloaded from wago.tools with its skin, external animations and textures,
-converted by m2creature.py (one copy per geoset combination a look needs) and stored under
-Creature\\RetailForms. Each look gets a CreatureDisplayInfo row (id from looks.tsv) on a
-CreatureModelData row cloned from the stock form model, so sounds and footprints stay the form's.
---sql writes the mod-transmog-plus rows (mod_transmog_plus_forms + preview creatures).
+converted by m2creature.py (one copy per geoset combination a look needs) and stored under the
+pack's folder. Each look gets a CreatureDisplayInfo row (id from the data file) on a
+CreatureModelData row cloned from the stock model it replaces, so sounds and footprints stay the
+same. --sql writes the mod-transmog-plus rows (mod_transmog_plus_forms + preview creatures).
 """
 import argparse
 import collections
@@ -23,18 +27,36 @@ import struct
 import sys
 
 from check_m2 import check
-from fetch import casc, db2, db2_rows
+from fetch import casc, db2, db2_rows, listfile
 from m2creature import Converter, Retail
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LOOKS = os.path.join(HERE, "..", "data", "looks.tsv")
-MODEL_ROOT = "Creature\\RetailForms"
-FIRST_MODEL_ID = 9500          # CreatureModelData ids (stock max 3440; ids the base uses move past the block)
-PREVIEW_CREATURE_BASE = 9501000  # creature_template entry = base + (display - 95000), for addon previews
 
-# Stock display each form clones for sounds, blood, footprints, size class.
-TEMPLATE_DISPLAY = {"bear": 2281, "cat": 892, "travel": 918, "aquatic": 2428, "flight": 21243,
-                    "moonkin": 15374, "tree": 864}
+# A pack: its data file, where its models go in the client, its id blocks and the stock display
+# each kind of look clones for sounds, blood, footprints and size class.
+#   first_model     CreatureModelData ids (ids the base client uses move past the block)
+#   preview_base    creature_template entries for the addon's previews (500 per pack); a look's
+#                   entry is base + (display - first_display) unless its row has a preview column
+#   prune_textures  leave out textures only the dropped particles and extra passes used, and
+#                   draw a two-texture effect mesh with its second texture when the first is
+#                   only a mask (MASK_WORDS in its file name)
+PACKS = {
+    "forms": dict(
+        looks="looks.tsv", root="Creature\\RetailForms", first_display=95000, first_model=9500,
+        preview_base=9501000, subname="Druid Form", sort_base=0, prune_textures=False,
+        template={"bear": 2281, "cat": 892, "travel": 918, "aquatic": 2428, "flight": 21243,
+                  "moonkin": 15374, "tree": 864},
+        source="data/looks.tsv. The display ids are in that repo's patch-R.MPQ."),
+    "totems": dict(
+        looks="totems.tsv", root="Creature\\RetailTotems", first_display=96000, first_model=96000,
+        preview_base=9501500, subname="Totem", sort_base=1000, prune_textures=True,
+        template={"fire": 4589, "earth": 4588, "water": 4587, "air": 4590},
+        source="data/totems.tsv. The display ids from 96000 are in that repo's patch-V.MPQ; the rest are\n"
+               "-- the 3.3.5a client's own totems."),
+}
+
+
+MASK_WORDS = ("mask", "square_soft", "gradient")
 
 
 # --- DBC ---------------------------------------------------------------------------------------
@@ -109,7 +131,7 @@ def shrink_blp(data, max_size):
 
 # --- MPQ ---------------------------------------------------------------------------------------
 
-def pack(out, files):
+def pack_mpq(out, files):
     lib = ctypes.CDLL(os.environ.get("STORMLIB", "/usr/local/lib/libstorm.dylib"))
     H = ctypes.c_void_p
     lib.SFileCreateArchive.argtypes = [ctypes.c_char_p, ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(H)]
@@ -134,8 +156,9 @@ def pack(out, files):
 
 # --- build -------------------------------------------------------------------------------------
 
-def load_looks():
-    lines = open(LOOKS, encoding="utf-8").read().splitlines()
+def load_looks(pack):
+    path = os.path.join(HERE, "..", "data", pack["looks"])
+    lines = open(path, encoding="utf-8").read().splitlines()
     head = lines[0].split("\t")
     return [dict(zip(head, l.split("\t"))) for l in lines[1:]]
 
@@ -150,17 +173,19 @@ def main():
     ap.add_argument("--cache", required=True)
     ap.add_argument("--work", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--pack", choices=sorted(PACKS), default="forms")
     ap.add_argument("--sql")
     ap.add_argument("--max-texture", type=int, default=1024)
     ap.add_argument("--only", help="comma-separated display ids (test builds)")
     ap.add_argument("--dbc-only", action="store_true",
-                    help="pack only the two DBCs: a small patch that loads after patch-R for clients "
-                         "whose own patch (an HD creature pack) ships these DBCs; build it from that "
-                         "patch's copies with --dbc")
+                    help="pack only the two DBCs: a small patch that loads after the full one for "
+                         "clients whose own patch (an HD creature pack) ships these DBCs; build it "
+                         "from that patch's copies with --dbc")
     args = ap.parse_args()
     os.makedirs(args.work, exist_ok=True)
+    pack = PACKS[args.pack]
 
-    looks = load_looks()
+    looks = load_looks(pack)
     if args.only:
         only = {int(x) for x in args.only.split(",")}
         looks = [l for l in looks if int(l["display"]) in only]
@@ -174,7 +199,8 @@ def main():
     cdi_rows, cdi_str, cdi_fields = read_dbc(os.path.join(args.dbc, "CreatureDisplayInfo.dbc"))
     cmd_rows, cmd_str, cmd_fields = read_dbc(os.path.join(args.dbc, "CreatureModelData.dbc"))
     taken = {r[0] for r in cdi_rows}
-    clash = [l["display"] for l in looks if int(l["display"]) in taken]
+    # A look without a retail display is one the client already has: no model, only the SQL.
+    clash = [l["display"] for l in looks if l["retail_display"] and int(l["display"]) in taken]
     if clash:
         sys.exit("display ids already in the base CreatureDisplayInfo.dbc: %s" % ", ".join(clash[:10]))
     base_models = {r[0] for r in cmd_rows}
@@ -182,12 +208,24 @@ def main():
     # Textures per model slot, for looks retail leaves blank (Haranir: the player's own skin).
     slot_fallback = collections.defaultdict(dict)
     for l in looks:
+        if not l["retail_display"]:
+            continue
         rd = cdi_r[l["retail_display"]]
         override = [int(x) for x in l.get("textures", "").split(",") if x]
         for k in range(3):
             fd = override[k] if override else int(rd["TextureVariationFileDataID_%d" % k])
             if fd:
                 slot_fallback[l["model"]].setdefault(k, fd)
+
+    # File names of the pack's model textures, to tell masks from the textures they shape.
+    texture_names = {}
+    if pack["prune_textures"]:
+        fdids = set()
+        for l in looks:
+            if l["retail_display"]:
+                model = Retail(casc(args.cache, int(cmd_r[cdi_r[l["retail_display"]]["ModelID"]]["FileDataID"])))
+                fdids.update(model.txid)
+        texture_names = listfile(args.cache, fdids)
 
     files = {}  # archive name -> source path
     variants = {}  # (fdid, geosets) -> (model id, folder, stem)
@@ -197,11 +235,15 @@ def main():
     new_cmd, new_cdi = [], []  # rows added to the client DBCs, mirrored into the server's *_dbc tables
     for l in looks:
         display = int(l["display"])
+        preview = int(l["preview"]) if l.get("preview") else pack["preview_base"] + display - pack["first_display"]
+        sql_rows.append((display, l["form"], l["name"], int(l["tier"]), preview))
+        if not l["retail_display"]:
+            continue
         rd = cdi_r[l["retail_display"]]
         rm = cmd_r[rd["ModelID"]]
         fdid = int(rm["FileDataID"])
         geosets = tuple(sorted(geo.get(l["retail_display"], {}).items()))
-        folder = "%s\\%s" % (MODEL_ROOT, folder_name(l["model"]))
+        folder = "%s\\%s" % (pack["root"], l.get("folder") or folder_name(l["model"]))
         key = (fdid, geosets)
         if key not in variants:
             raw = casc(args.cache, fdid)
@@ -211,8 +253,16 @@ def main():
             if any(k[0] == fdid for k in variants):
                 stem += "_" + hashlib.md5(repr(geosets).encode()).hexdigest()[:6]
             conv = Converter(raw, casc(args.cache, m.sfid[0]), anims, valid, stem)
+            drawn = None
+            if pack["prune_textures"]:
+                conv.mask_textures = {i for i, fd in enumerate(m.txid) if any(
+                    w in os.path.basename(texture_names.get(fd, "")) for w in MASK_WORDS)}
+                drawn = conv.batch_textures(dict(geosets))
             textures, slots = [], set()
             for i, (ttype, tflags, _n, _o) in enumerate(m.arr("textures", "<IIII")):
+                if drawn is not None and i not in drawn:
+                    textures.append((None, tflags, None))  # only particles or extra passes used it
+                    continue
                 if ttype not in (0, 11, 12, 13):
                     fd = m.txid[i] if i < len(m.txid) else 0
                     if not fd:
@@ -242,13 +292,15 @@ def main():
             open(sp, "wb").write(skin)
             files["%s\\%s.m2" % (folder, stem)] = ("file", mp)
             files["%s\\%s00.skin" % (folder, stem)] = ("file", sp)
-            model_id = FIRST_MODEL_ID + len(variants)
-            row = row_of(cmd_rows, row_of(cdi_rows, TEMPLATE_DISPLAY[l["form"]])[1])
+            model_id = pack["first_model"] + len(variants)
+            row = row_of(cmd_rows, row_of(cdi_rows, pack["template"][l["form"]])[1])
             row[0] = model_id
             row[2] = add_string(cmd_str, "%s\\%s.mdx" % (folder, stem))
             row[4] = f32(rm["ModelScale"] or 1)
-            row[14] = f32(rm["CollisionWidth"])
-            row[15] = f32(rm["CollisionHeight"])
+            # Retail marks an unset collision size with -20000000: keep the stock model's then.
+            if float(rm["CollisionWidth"]) >= 0 and float(rm["CollisionHeight"]) >= 0:
+                row[14] = f32(rm["CollisionWidth"])
+                row[15] = f32(rm["CollisionHeight"])
             row[16] = f32(rm["MountHeight"])
             for k in range(6):
                 row[17 + k] = f32(rm["GeoBox_%d" % k])
@@ -263,7 +315,7 @@ def main():
             if conv.dropped:
                 warnings.append("%s: stale .anim files, animations %s dropped" % (stem, sorted(set(conv.dropped))))
         model_id, folder, stem = variants[key]
-        row = row_of(cdi_rows, TEMPLATE_DISPLAY[l["form"]])
+        row = row_of(cdi_rows, pack["template"][l["form"]])
         row[0] = display
         row[1] = model_id
         row[3] = 0
@@ -290,7 +342,6 @@ def main():
         cdi_rows.append(row)
         new_cdi.append((row, [cdi_str[row[6 + k]:cdi_str.index(b"\0", row[6 + k])].decode() if row[6 + k] else ""
                               for k in range(3)]))
-        sql_rows.append((display, l["form"], l["name"], int(l["tier"])))
 
     # Textures (top mips dropped above --max-texture).
     tex_dir = os.path.join(args.work, "textures")
@@ -305,7 +356,7 @@ def main():
     # Models whose id the base client already uses (Reforged HD has 9511 and 9571) move past the
     # block, the way tools in wow-server's rebase_patch.py --renumber do it, so both agree.
     ours = {row[0] for row, _n in new_cmd}
-    after = max(ours)
+    after = max(ours, default=0)
     for row, _n in new_cmd:
         if row[0] in base_models:
             while after in ours or after in base_models:
@@ -323,13 +374,13 @@ def main():
     files["DBFilesClient\\CreatureModelData.dbc"] = ("file", os.path.join(args.work, "CreatureModelData.dbc"))
     if args.dbc_only:
         files = {n: f for n, f in files.items() if n.startswith("DBFilesClient\\")}
-    pack(args.out, [(src, name) for name, (_k, src) in sorted(files.items())])
+    pack_mpq(args.out, [(src, name) for name, (_k, src) in sorted(files.items())])
     print("%s: %d looks, %d models, %d files, %.1f MB" % (
         args.out, len(looks), len(variants), len(files), os.path.getsize(args.out) / 1e6))
     for w in warnings:
         print("warning:", w)
     if args.sql:
-        write_sql(args.sql, sql_rows, new_cdi, new_cmd)
+        write_sql(args.sql, pack, sql_rows, new_cdi, new_cmd)
 
 
 def sql_str(s):
@@ -345,29 +396,36 @@ def fl(v):
     return "%g" % struct.unpack("<f", struct.pack("<I", v))[0]
 
 
-def write_sql(path, rows, new_cdi, new_cmd):
+def write_sql(path, pack, rows, new_cdi, new_cmd):
     """mod-transmog-plus world rows: the looks, and one creature per look for the addon's preview
     (3.3.5 model frames can show a creature entry, not a display id)."""
-    previews = [(PREVIEW_CREATURE_BASE + d - 95000, d, name) for d, _form, name, _tier in rows]
-    last = PREVIEW_CREATURE_BASE + 499
-    if any(entry > last for entry, _d, _n in previews):
-        sys.exit("preview creature entries run past %d" % last)
+    previews = [(preview, d, name) for d, _form, name, _tier, preview in rows]
+    first, last = pack["preview_base"], pack["preview_base"] + 499
+    if any(not first <= entry <= last for entry, _d, _n in previews):
+        sys.exit("preview creature entries outside %d-%d" % (first, last))
+    if len({entry for entry, _d, _n in previews}) != len(previews):
+        sys.exit("two looks share a preview creature entry")
+    kinds = ", ".join(sql_str(k) for k in pack["template"])
     with open(path, "w", encoding="utf-8") as f:
         f.write("-- Generated by buildthehomelab/wow-mod-retail-druid-forms tools/build_patch.py from\n")
-        f.write("-- data/looks.tsv. The display ids are in that repo's patch-R.MPQ.\n")
-        f.write("DELETE FROM `mod_transmog_plus_forms`;\n")
+        f.write("-- %s\n" % pack["source"])
+        f.write("DELETE FROM `mod_transmog_plus_forms` WHERE `Form` IN (%s);\n" % kinds)
         f.write("INSERT INTO `mod_transmog_plus_forms` (`DisplayId`, `Form`, `Name`, `UnlockPhase`, `PreviewCreature`, `SortOrder`) VALUES\n")
-        f.write(",\n".join("(%d, %s, %s, %d, %d, %d)" % (d, sql_str(form), sql_str(name), tier,
-                                                       PREVIEW_CREATURE_BASE + d - 95000, i + 1)
-                           for i, (d, form, name, tier) in enumerate(rows)) + ";\n\n")
-        f.write("-- Preview creatures %d-%d: never spawned.\n" % (PREVIEW_CREATURE_BASE, last))
-        f.write("DELETE FROM `creature_template_model` WHERE `CreatureID` BETWEEN %d AND %d;\n" % (PREVIEW_CREATURE_BASE, last))
-        f.write("DELETE FROM `creature_template` WHERE `entry` BETWEEN %d AND %d;\n" % (PREVIEW_CREATURE_BASE, last))
+        f.write(",\n".join("(%d, %s, %s, %d, %d, %d)" % (d, sql_str(form), sql_str(name), tier, preview,
+                                                       pack["sort_base"] + i + 1)
+                           for i, (d, form, name, tier, preview) in enumerate(rows)) + ";\n\n")
+        f.write("-- Preview creatures %d-%d: never spawned.\n" % (first, last))
+        f.write("DELETE FROM `creature_template_model` WHERE `CreatureID` BETWEEN %d AND %d;\n" % (first, last))
+        f.write("DELETE FROM `creature_template` WHERE `entry` BETWEEN %d AND %d;\n" % (first, last))
         f.write("INSERT INTO `creature_template` (`entry`, `name`, `subname`, `minlevel`, `maxlevel`, `faction`, `type`, `unit_class`) VALUES\n")
-        f.write(",\n".join("(%d, %s, 'Druid Form', 1, 1, 35, 1, 1)" % (e, sql_str(n)) for e, _d, n in previews) + ";\n")
+        f.write(",\n".join("(%d, %s, %s, 1, 1, 35, 1, 1)" % (e, sql_str(n), sql_str(pack["subname"]))
+                           for e, _d, n in previews) + ";\n")
         f.write("INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`) VALUES\n")
         f.write(",\n".join("(%d, 0, %d, 1, 1)" % (e, d) for e, d, _n in previews) + ";\n\n")
 
+        if not new_cdi:
+            print("wrote", path)
+            return
         # The server checks creature displays against its own DBC stores: give it the patch's rows.
         ids = [r[0] for r, _t in new_cdi]
         f.write("-- The patch's CreatureDisplayInfo and CreatureModelData rows, for the server's DBC stores.\n")
