@@ -1,0 +1,12 @@
+{
+  "looks": "data/looks.tsv",
+  "root": "Creature\\RetailForms",
+  "first_display": 95000,
+  "first_model": 9500,
+  "preview_base": 9501000,
+  "subname": "Druid Form",
+  "sort_base": 0,
+  "prune_textures": false,
+  "template": {"bear": 2281, "cat": 892, "travel": 918, "aquatic": 2428, "flight": 21243, "moonkin": 15374, "tree": 864},
+  "source": "buildthehomelab/wow-mod-retail-druid-forms data/looks.tsv. The display ids are in that repo's patch-R.MPQ."
+}

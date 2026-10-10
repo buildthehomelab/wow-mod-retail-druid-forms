@@ -1,14 +1,19 @@
 # mod-retail-druid-forms
 
-Tools that bring retail World of Warcraft's druid form looks and shaman totem looks to a 3.3.5a
-client. They download the retail models, convert them (animations included) to the 3.3.5a model
-format, and build a client patch that adds each look as a creature display. Everyone with the
-patch sees everyone's looks, with no client hacks.
+Retail World of Warcraft's druid form looks for a 3.3.5a realm: 265 looks across bear, cat, travel,
+aquatic, flight, moonkin and Tree of Life, picked in the Forms tab of the Transmogrify window.
 
-The server side (which looks a character has unlocked, the Forms and Totems tabs, swapping the
-model when the druid shifts or the shaman drops a totem) lives in
-[wow-mod-transmog-plus](https://github.com/buildthehomelab/wow-mod-transmog-plus). This repo is
-only the client patch toolchain.
+It is a look pack for [wow-mod-transmog-plus](https://github.com/buildthehomelab/wow-mod-transmog-plus),
+which has the tab, remembers what each character picked and swaps the model. A pack is two things:
+
+- a small server module: its world SQL lists the looks (`data/sql/db-world/mod_retail_druid_forms.sql`). There
+  is no code to run and nothing to configure.
+- a client patch, `patch-R.MPQ`, with the models. Everyone with the patch sees everyone's
+  looks, with no client hacks.
+
+Both are built from this repo's list of looks with
+[wow-mod-retail-creatures](https://github.com/buildthehomelab/wow-mod-retail-creatures), the
+converter the packs share.
 
 ## The looks
 
@@ -52,140 +57,70 @@ classic looks are free; each phase after that unlocks a themed batch:
 
 To move a batch, change its line in `TIERS` in `tools/inventory.py` and rerun it.
 
-## The totems
+## Installing
 
-`data/totems.tsv` lists 80 totem looks: 20 sets of four (fire, earth, water, air). A shaman
-picks a look per element, whatever their race.
+1. Install [wow-mod-transmog-plus](https://github.com/buildthehomelab/wow-mod-transmog-plus).
+2. Add this module and rebuild. The SQL applies on the next start, and the druids' Forms tab appears.
 
-Five sets are the 3.3.5a client's own race totems. They need no patch and keep all their
-effects; any shaman can use them from the start. The other 15 are retail's, converted:
+   ```bash
+   cd azerothcore/modules
+   git clone https://github.com/buildthehomelab/wow-mod-retail-druid-forms.git mod-retail-druid-forms
+   ```
 
-| Phase | Unlocks |
-| --- | --- |
-| 0 | Tauren, Orc, Troll, Dwarf and Draenei totems (the client's own) |
-| 1 Molten Core | Dark Iron |
-| 2 Onyxia | Tauren (Remastered), retail's remake of the classic totems |
-| 3 Blackwing Lair | Goblin |
-| 4 Zul'Gurub | Zandalari |
-| 5 AQ War Effort | Vulpera |
-| 6 Ahn'Qiraj | Pandaren |
-| 7 Naxxramas | Dark Shaman (Ashflare, Rusted Iron, Foulstream, Poisonmist) |
-| 8 Road to Outland | Highmountain |
-| 9 Karazhan / Gruul / Magtheridon | Mag'har |
-| 10 SSC / Tempest Keep | Kul Tiran |
-| 11 Hyjal / Black Temple | Draenor Clans |
-| 12 Zul'Aman | Haranir |
-| 13 Sunwell | Draenei (Remastered), retail's crystal totems |
-| 15 Ulduar | Earthen |
-| 17 Icecrown Citadel | Maelstrom (the Legion class hall totems) |
+   Clone into `mod-retail-druid-forms` exactly: AzerothCore derives the module's loader function from the folder
+   name.
+3. Build the client patch (below) and give it to every player. It has to be required: a player
+   without it sees nothing where one of these looks stands.
 
-Retail has no table of totem looks (a totem follows the shaman's race), so the sets, their
-retail display ids and their phases are listed in `tools/totem_inventory.py`. To move a set,
-change its phase there and rerun it.
+Without this module the realm is plain transmog: no looks, no tab.
 
-## How it works
+## Building the client patch
 
-- `tools/inventory.py` reads retail's barber shop tables (ChrCustomizationDisplayInfo and
-  friends, from [wago.tools](https://wago.tools)) and writes `data/looks.tsv`. Display ids
-  already in the file never move, so a rerun can't change a look a player picked.
-- `tools/m2creature.py` converts a retail model (MD21, v272/274) to 3.3.5a (MD20, v264):
-  - It keeps the skin-0 mesh, all bones, and every animation 3.3.5 knows (ids 0-505). Animations
-    in external `.anim` files are inlined.
-  - It also keeps attachments, key bones, colours, texture animations, footstep events and the
-    portrait camera.
-  - Retail creature geosets are baked in per look, because the 3.3.5 client can't pick them.
-  - Particles, ribbons, lights and extra texture passes (env/glow) have no 3.3.5 equivalent and
-    are dropped. The artifact forms lose some sparkle.
-  - Some retail `.anim` files no longer match their model (left over from an older version).
-    Those animations (mostly sit, sleep and emotes) are dropped, and the client falls back to
-    another animation.
-  - A bounding box far bigger than the mesh is pulled in to it. Retail's covers every animation
-    (the goblin fire totem's box is 26 yards tall, because its rocket takes off when it dies),
-    and a 3.3.5 model frame seems to size a creature by that box: such a look previewed as a
-    speck.
-- `tools/totem_inventory.py` writes `data/totems.tsv` from its list of totem sets, with the
-  same rule: ids already in the file never move.
-- `tools/check_m2.py` checks a converted model the way the client reads it.
-- `tools/build_patch.py` downloads everything, converts each model once per geoset combination,
-  and writes the patch. It also writes the mod-transmog-plus SQL: the looks, one preview
-  creature per look, and the server copies of the new display rows. `--pack` picks what to build:
-  - `forms` (the default) is `patch-R.MPQ`: CreatureDisplayInfo rows 95000+, CreatureModelData
-    rows 9500+, models under `Creature\RetailForms`.
-  - `totems` is `patch-V.MPQ`: CreatureDisplayInfo and CreatureModelData rows 96000+, models
-    under `Creature\RetailTotems`. Textures only the dropped particles used are left out, and
-    an effect mesh that blends two textures is drawn with the one that isn't a mask.
-  - Textures larger than `--max-texture` (default 1024) lose their top mip levels.
-
-Nothing from Blizzard is stored in this repo; the files come from wago.tools at build time.
-
-## Building
+Clone the converter next to this repo (as `mod-retail-creatures`), or point `RETAIL_CREATURES` at it.
 
 ```bash
-python3 tools/inventory.py --cache ~/forms-cache
+python3 tools/inventory.py --cache ~/retail-cache
 ```
 
 ```bash
-python3 tools/build_patch.py --dbc <dbc dir> --cache ~/forms-cache --work ~/forms-work --out patch-R.MPQ --sql forms_data.sql
+python3 ../mod-retail-creatures/tools/build_patch.py --pack . --dbc <dbc dir> --cache ~/retail-cache --work ~/mod_retail_druid_forms-work --out patch-R.MPQ --sql data/sql/db-world/mod_retail_druid_forms.sql
 ```
+
+`inventory.py` reads retail's barber shop tables (ChrCustomizationDisplayInfo and friends) and
+writes `data/looks.tsv`. Display ids already in the file never move, so a rerun can't change a look
+a player picked. Run it only to pick up new retail looks or after changing `TIERS`.
 
 `--dbc` needs `CreatureDisplayInfo.dbc`, `CreatureModelData.dbc` and `AnimationData.dbc` as the
 players' client has them: the copies from the last patch in its load order that ships each one. On
-the realm's base client (TheraWoW with Project Reforged HD) that's Reforged's `patch-C.mpq` for the
-two creature DBCs and the stock `AnimationData.dbc` (`Data/enUS/patch-enUS-3.MPQ`). Model ids the base
-already uses (Reforged has 9511 and 9571) move past the 9500 block, to 9590 and 9591.
+this realm's base client (TheraWoW with Project Reforged HD) that's Reforged's `patch-C.mpq` for the
+two creature DBCs and the stock `AnimationData.dbc` (`Data/enUS/patch-enUS-3.MPQ`). Model ids the
+base already uses (Reforged has 9511 and 9571) move past the 9500 block, to 9590 and 9591. The
+converter's README has more on HD creature packs.
 
-The totem patch goes on top of the form patch. Both ship `CreatureDisplayInfo.dbc` and
-`CreatureModelData.dbc`, and the later letter wins, so build patch-V with `--dbc` holding the
-two DBCs from the finished patch-R (plus `AnimationData.dbc`), and rebuild it whenever patch-R
-changes:
+The build rewrites `data/sql/db-world/mod_retail_druid_forms.sql` to match the patch: commit it with the
+patch you ship. Ids: CreatureDisplayInfo 95000+, CreatureModelData 9500+, preview creatures in
+9501000-9501499 (subname `Druid Form`), `pack.json` has them all.
 
-```bash
-python3 tools/totem_inventory.py --cache ~/forms-cache
-```
+Nothing from Blizzard is stored in this repo; the files come from wago.tools at build time.
 
-```bash
-python3 tools/build_patch.py --pack totems --dbc <patch-R's DBCs> --cache ~/forms-cache --work ~/totems-work --out patch-V.MPQ --sql totems_data.sql
-```
+## Uninstalling
 
-### HD creature packs
-
-A patch replaces whole files. An HD creature pack ships its own `CreatureDisplayInfo.dbc` and
-`CreatureModelData.dbc`, so the form patch has to carry the pack's rows too: build it with `--dbc`
-pointing at the pack's copies, and give it a letter that loads after the pack's (patch-R loads after
-Reforged's patch-C). Built on the wrong DBCs, the pack's creatures lose their textures (white armour
-on HD kodos, for one).
-
-When the base client changes, the finished patch can also be moved onto it without downloading the
-models again: `tools/client-patches/rebase_patch.py` in the realm's server repo merges the DBCs
-(`--renumber CreatureModelData:CreatureDisplayInfo.1` gives clashing models the same new ids as above).
-A client whose own HD pack isn't the realm's can still use a small DBC-only patch that loads after
-patch-R:
-
-```bash
-python3 tools/build_patch.py --dbc <the pack's DBCs + AnimationData.dbc> --cache ~/forms-cache --work ~/forms-work-hd --out patch-Y.MPQ --dbc-only
-```
+Remove the module folder, rebuild, and run `data/sql/uninstall/mod_retail_druid_forms_uninstall.sql` by hand.
+Players can keep the patch: unused displays do nothing.
 
 ## Requirements
 
-- Python 3.10+ (standard library only).
-- [StormLib](https://github.com/ladislav-zezula/StormLib) as a shared library. The default is
-  `/usr/local/lib/libstorm.dylib`; point `STORMLIB` at yours.
+- AzerothCore with [wow-mod-transmog-plus](https://github.com/buildthehomelab/wow-mod-transmog-plus).
+- To build the patch: [wow-mod-retail-creatures](https://github.com/buildthehomelab/wow-mod-retail-creatures)
+  and what it needs (Python 3.10+, StormLib).
 
 ## Troubleshooting
 
-- **A druid shows as nothing, or a white model**: that client lacks patch-R, or an HD creature
-  pack loads after it. Build the small `--dbc-only` patch above for that client.
-- **Druid forms vanish after adding patch-V**: it was built on DBCs without the form rows. Build
-  it with `--dbc` from patch-R.
-- **A look's preview tile is empty, or the look is tiny in a model frame**: its bounding box is
-  far bigger than its mesh. The converter fits the box now; rebuild the patch.
-- **A retail totem has no flames, drips or sparks**: those are particle effects, which the
-  converter drops. The mesh glows and scrolling effects stay. The client's own five race sets
-  keep everything.
-- **White armour on other creatures after adding patch-R**: same cause; the HD pack's DBCs were
-  replaced. Use the `--dbc-only` patch.
-- **wago.tools answers 502/504**: the fetcher retries; rerun if it still gives up. Downloads are
-  cached in `--cache`.
+- **A druid shows as nothing, or a white model**: that client lacks patch-R, or a patch that
+  ships the creature DBCs loads after it.
+- Anything about the models themselves (black or tiny previews, missing effects, white armour
+  on other creatures): see the converter's
+  [troubleshooting](https://github.com/buildthehomelab/wow-mod-retail-creatures#troubleshooting).
 
 ## Credits
 

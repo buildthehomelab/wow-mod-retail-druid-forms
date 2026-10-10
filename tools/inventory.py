@@ -12,10 +12,21 @@ import argparse
 import collections
 import os
 import re
-
-from fetch import db2, db2_rows, listfile
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# fetch.py comes with the converter, wow-mod-retail-creatures: clone it next to this repo, or
+# point RETAIL_CREATURES at its checkout.
+for _repo in (os.environ.get("RETAIL_CREATURES"), os.path.join(HERE, "..", "..", "mod-retail-creatures"),
+              os.path.join(HERE, "..", "..", "wow-mod-retail-creatures")):
+    if _repo and os.path.isfile(os.path.join(_repo, "tools", "fetch.py")):
+        sys.path.insert(0, os.path.join(_repo, "tools"))
+        break
+else:
+    sys.exit("wow-mod-retail-creatures not found: clone it next to this repo, or set RETAIL_CREATURES")
+
+from fetch import db2, db2_rows, listfile  # noqa: E402
+
 LOOKS = os.path.join(HERE, "..", "data", "looks.tsv")
 FIRST_DISPLAY = 95000
 
