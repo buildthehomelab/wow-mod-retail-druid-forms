@@ -181,6 +181,9 @@ class Converter:
                      if s[0] in valid_anim_ids and self.buffers[self.source[i]] is not None]
         self.new_index = {old: new for new, old in enumerate(self.kept)}
         self.blob = Blob()
+        self.geosets = {}
+        self.skipped_textures = set()
+        self.mask_textures = set()  # texture indices that only shape another texture (see pick)
 
     def _fits(self, seq):
         """Every bone keyframe array of an external sequence lies inside its .anim data."""
@@ -208,12 +211,22 @@ class Converter:
         interp, gseq, tsn, tso, vn, vo = struct.unpack(TRACK, raw)
         md = self.m.md
         if gseq != -1:
+            loops = self.m.arr("global_loops", "<I")
+            loop = loops[gseq][0] if gseq < len(loops) else 0
             out = []
             for k in range(tsn):
                 n, off = struct.unpack_from("<II", md, tso + 8 * k)
                 vn2, voff = struct.unpack_from("<II", md, vo + 8 * k) if value_size else (n, 0)
-                out.append((list(struct.unpack_from("<%dI" % n, md, off)),
-                            md[voff:voff + value_size * vn2]))
+                times = list(struct.unpack_from("<%dI" % n, md, off))
+                values = md[voff:voff + value_size * vn2]
+                # Retail leaves keys past the end of a global loop (a lone key at 633 in a loop of
+                # 0, on the air totems). The loop never reaches them: keep the ones it does, or
+                # the first as a fixed value.
+                if times and times[-1] > loop and (not value_size or vn2 == n):
+                    keep = max(1, sum(1 for t in times if t <= loop))
+                    times = [min(t, loop) for t in times[:keep]]
+                    values = values[:value_size * keep]
+                out.append((times, values))
             return (interp, gseq, out)
         out = []
         for old in self.kept:
@@ -414,10 +427,34 @@ class Converter:
                 continue  # retail extra passes (env/glow)
             if not self.shows(sk.submeshes[sub][0]):
                 continue
-            if tex_lookup[tex_combo][0] in self.skipped_textures:
+            if tex_lookup[tex_combo + self.pick(bt)][0] in self.skipped_textures:
                 continue
             out.append(bt)
         return out
+
+    def pick(self, bt):
+        """Which of a batch's textures to draw with, as an offset into its texture combo.
+        3.3.5 gets one texture per batch here. On a solid surface that's the first (the diffuse).
+        A blended effect mesh multiplies two, and when the first is only a mask (a soft white
+        square over a water tile, say) the second is the one worth seeing."""
+        count, tex_combo = bt[8], bt[9]
+        if count < 2 or not self.mask_textures:
+            return 0
+        if self.m.arr("materials", "<HH")[bt[6]][1] < 2:
+            return 0
+        tex_lookup = self.m.arr("texture_lookup", "<h")
+        if tex_combo + 1 >= len(tex_lookup):
+            return 0
+        first, second = tex_lookup[tex_combo][0], tex_lookup[tex_combo + 1][0]
+        return 1 if first in self.mask_textures and second not in self.mask_textures else 0
+
+    def batch_textures(self, geosets=None):
+        """Indices of the textures the converted mesh draws with (first pass, shown geosets).
+        The rest belong to particles, ribbons and extra passes, which don't make the trip."""
+        self.geosets = geosets or {}
+        tex_lookup = self.m.arr("texture_lookup", "<h")
+        return {tex_lookup[bt[9] + self.pick(bt)][0] for bt in self.skin.batches
+                if bt[7] == 0 and self.shows(self.skin.submeshes[bt[3]][0])}
 
     def split_submeshes(self, batches):
         """Rebuilds the skin's vertex map, indices and submeshes with only the submeshes those
@@ -504,9 +541,14 @@ class Converter:
         parts.append(add(subs, len(submeshes)))
         batches = b""
         nb = 0
+        transforms = self.m.h["transform_lookup"][0]
         for bt in drawn:
             (flags, prio, shader, sub, geoset, color, mat, layer, count, tex_combo,
              uv_combo, weight_combo, transform_combo) = bt
+            if self.pick(bt):  # the second texture, with its own scrolling
+                tex_combo += 1
+                if transform_combo + 1 < transforms:
+                    transform_combo += 1
             for piece in sub_map[sub]:
                 batches += struct.pack("<BbHHHhHHHHHHH", flags, prio, 0, piece, piece, color, mat, 0, 1,
                                        tex_combo, 0, weight_combo, transform_combo)
