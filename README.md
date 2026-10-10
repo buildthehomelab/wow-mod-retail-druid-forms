@@ -103,6 +103,10 @@ change its phase there and rerun it.
     (the goblin fire totem's box is 26 yards tall, because its rocket takes off when it dies),
     and a 3.3.5 model frame seems to size a creature by that box: such a look previewed as a
     speck.
+  - A colour that doesn't change gets its key in every animation. Retail writes it once, in the
+    model's first animation, and its client keeps using it; the 3.3.5 client gives an animation
+    without a key black. A totem whose first animation isn't Stand stood as a black shape, and
+    a glow went out whenever a form left its first animation.
 - `tools/totem_inventory.py` writes `data/totems.tsv` from its list of totem sets, with the
   same rule: ids already in the file never move.
 - `tools/check_m2.py` checks a converted model the way the client reads it.
@@ -179,6 +183,8 @@ python3 tools/build_patch.py --dbc <the pack's DBCs + AnimationData.dbc> --cache
   it with `--dbc` from patch-R.
 - **A look's preview tile is empty, or the look is tiny in a model frame**: its bounding box is
   far bigger than its mesh. The converter fits the box now; rebuild the patch.
+- **A look is a black shape, in a preview tile and in the world**: its colour track has no key
+  for the animation playing. The converter fills those now; rebuild the patch.
 - **A retail totem has no flames, drips or sparks**: those are particle effects, which the
   converter drops. The mesh glows and scrolling effects stay. The client's own five race sets
   keep everything.

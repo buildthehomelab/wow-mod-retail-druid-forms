@@ -284,6 +284,40 @@ class Converter:
         raw, n = self.m.raw(name, size)
         return self.blob.add(raw, n)
 
+    def colors(self):
+        """M2Color records (a colour track and an alpha track each). Retail writes a colour that
+        doesn't change as one key in the model's first sequence and leaves the rest empty; its
+        client goes on using that key. The 3.3.5 client gives a sequence without keys the
+        track's default instead, and a colour's default is black: a totem whose first sequence
+        isn't Stand stood as a black shape, and a glow went out whenever a form left its first
+        animation. So every empty sequence of a colour track gets that first key, or white if
+        retail has none. Alpha tracks stay as they are: their default is opaque, which fits how
+        retail keys them (fade in at spawn, fade out at death, nothing while standing)."""
+        raw, n = self.m.raw("colors", 40)
+        rows = b""
+        for i in range(n):
+            rec = raw[i * 40:(i + 1) * 40]
+            interp, gseq, per = self.read_track(rec[:TRACK_SIZE], 12)
+            if gseq == -1 and self.kept:
+                rest = self.rest_value(rec[:TRACK_SIZE], 12) or struct.pack("<3f", 1.0, 1.0, 1.0)
+                per = [(t, v) if t else ([0], rest) for t, v in per]
+            rows += self.write_track((interp, gseq, per), 12)
+            rows += self.write_track(self.read_track(rec[TRACK_SIZE:], 2), 2)
+        return self.blob.add(rows, n)
+
+    def rest_value(self, raw, value_size):
+        """The first key of a track's first retail sequence, or None when that one has no keys."""
+        interp, gseq, tsn, tso, vn, vo = struct.unpack(TRACK, raw)
+        if not tsn or not vn:
+            return None
+        md = self.m.md
+        buf = self.buffers[self.source[0]] if self.seqs else md
+        n, off = struct.unpack_from("<II", md, tso)
+        vn2, voff = struct.unpack_from("<II", md, vo)
+        if not n or n != vn2 or buf is None or voff + value_size > len(buf):
+            return None
+        return bytes(buf[voff:voff + value_size])
+
     # --- model --------------------------------------------------------------------------
     def convert(self, textures, geosets=None, materials_mask=0x1F):
         """textures: list of (type, flags, file name or None) replacing the retail texture list
@@ -325,7 +359,7 @@ class Converter:
         h["bones"] = b.add(rows, n)
         h["key_bone_lookup"] = self.copy("key_bone_lookup", 2)
         h["vertices"] = self.copy("vertices", 48)
-        h["colors"] = self.records("colors", 40, [(0, 12), (20, 2)])
+        h["colors"] = self.colors()
 
         # A texture type 3.3.5 can't fill (None) gets a placeholder; its batches are skipped.
         self.skipped_textures = {i for i, t in enumerate(textures) if t[0] is None}
