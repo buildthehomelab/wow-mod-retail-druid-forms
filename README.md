@@ -92,9 +92,9 @@ a player picked. Run it only to pick up new retail looks or after changing `TIER
 
 `--dbc` needs `CreatureDisplayInfo.dbc`, `CreatureModelData.dbc` and `AnimationData.dbc` as the
 players' client has them: the copies from the last patch in its load order that ships each one. On
-this realm's base client (TheraWoW with Project Reforged HD) that's Reforged's `patch-C.mpq` for the
-two creature DBCs and the stock `AnimationData.dbc` (`Data/enUS/patch-enUS-3.MPQ`). Model ids the
-base already uses (Reforged has 9511 and 9571) move past the 9500 block, to 9590 and 9591. The
+a client with Project Reforged HD that's Reforged's `patch-C.mpq` for the two creature DBCs and the
+stock `AnimationData.dbc` (`Data/enUS/patch-enUS-3.MPQ`). Model ids the base already uses (Reforged
+has 9511 and 9571) move past the 9500 block, to 9590 and 9591. The
 converter's README has more on HD creature packs.
 
 The build rewrites `data/sql/db-world/mod_retail_druid_forms.sql` to match the patch: commit it with the
