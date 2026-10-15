@@ -113,7 +113,7 @@ FAMILY.update({"druidbear2": "Kaldorei Bear", "druidcat2": "Kaldorei Cat", "drui
                "druidtravelcat": "Cheetah", "druidtravelhmtauren": "Highmountain Moose",
                "druidtravelzandalaritroll": "Zandalari Raptor", "druidaquaticzandalari": "Zandalari Sea Creature",
                "druidaquatickultiran": "Kul Tiran Sea Creature", "druidaquaticharanir": "Haranir Sea Creature",
-               "druidtravelkultiran": "Kul Tiran Stag", "druidtravelharanir": "Haranir Stag",
+               "druidtravelkultiran": "Kul Tiran Stag", "druidtravelharanir": "Haranir Sable",
                "druidtreeharanir": "Haranir Treant", "druidtreeform": "Tree of Life", "harronirbat": "Haranir Bat",
                "tindralmoonkin": "Haranir Moonkin", "tindralmoonkin_haranir": "Batbear",
                "druidflighthmtauren": "Highmountain Eagle", "druidflightzandalaritroll": "Zandalari Pterrordax",
