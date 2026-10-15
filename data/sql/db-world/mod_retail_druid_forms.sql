@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS `mod_transmog_plus_forms` (
     `SortOrder` int(10) unsigned NOT NULL DEFAULT 0,
     PRIMARY KEY (`DisplayId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-DELETE FROM `mod_transmog_plus_forms` WHERE `Form` IN ('bear', 'cat', 'travel', 'aquatic', 'flight', 'moonkin', 'tree');
+DELETE FROM `mod_transmog_plus_forms` WHERE `Form` IN ('bear', 'cat', 'travel', 'aquatic', 'flight', 'moonkin', 'tree') AND `PreviewCreature` BETWEEN 9501000 AND 9501499;
 INSERT INTO `mod_transmog_plus_forms` (`DisplayId`, `Form`, `Name`, `UnlockPhase`, `PreviewCreature`, `SortOrder`) VALUES
 (95000, 'bear', 'Kaldorei Bear (Black)', 0, 9501000, 1),
 (95001, 'bear', 'Kaldorei Bear (Blue)', 0, 9501001, 2),
