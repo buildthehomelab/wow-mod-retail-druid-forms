@@ -90,12 +90,19 @@ python3 ../mod-retail-creatures/tools/build_patch.py --pack . --dbc <dbc dir> --
 writes `data/looks.tsv`. Display ids already in the file never move, so a rerun can't change a look
 a player picked. Run it only to pick up new retail looks or after changing `TIERS`.
 
-`--dbc` needs `CreatureDisplayInfo.dbc`, `CreatureModelData.dbc` and `AnimationData.dbc` as the
-players' client has them: the copies from the last patch in its load order that ships each one. On
-a client with Project Reforged HD that's Reforged's `patch-C.mpq` for the two creature DBCs and the
-stock `AnimationData.dbc` (`Data/enUS/patch-enUS-3.MPQ`). Model ids the base already uses (Reforged
-has 9511 and 9571) move past the 9500 block, to 9590 and 9591. The
-converter's README has more on HD creature packs.
+`--dbc` needs `CreatureDisplayInfo.dbc`, `CreatureModelData.dbc`, `ParticleColor.dbc` and
+`AnimationData.dbc` as the players' client has them: the copies from the last patch in its load
+order that ships each one. On a client with Project Reforged HD that's Reforged's `patch-C.mpq` for
+the two creature DBCs, and the stock `ParticleColor.dbc` (`Data/enUS/patch-enUS-2.MPQ`) and
+`AnimationData.dbc` (`Data/enUS/patch-enUS-3.MPQ`). Without `ParticleColor.dbc` the build only
+warns, and the forms' particles come out the wrong colour, or white. Model ids the base already
+uses (Reforged has 9511 and 9571) move past the 9500 block, to 9590 and 9591. The converter's
+README has more on HD creature packs.
+
+The models keep their retail effects: particles, ribbons and glows (`"effects": true` in
+[`pack.json`](pack.json), an option of the converter). 33 looks colour their particles from their
+display, so the patch also ships `ParticleColor.dbc` with those 33 rows added. A patch after this one
+that ships `ParticleColor.dbc` must be built on this patch's copy, or those looks lose their colours.
 
 The build rewrites `data/sql/db-world/mod_retail_druid_forms.sql` to match the patch: commit it with the
 patch you ship. Ids: CreatureDisplayInfo 95000+, CreatureModelData 9500+, preview creatures in
@@ -141,8 +148,13 @@ Category: Classes / Druid
   new batch, from the Zandalari forms in Zul'Gurub to the Batbear in the Ruby Sanctum.
 - Previews show each look; locked ones show as a silhouette and tell you where they unlock.
 
-> These are retail's own form models, converted with their animations. Particle effects don't
-> survive the trip, so the artifact forms glow a little less than on retail.
+- The forms keep their particle effects and glows: Fangs of Ashamane, Ghost of the Pridemother,
+  Nature's Fury, Primal Stalker, Stonepaw, Avatar of Ursol, Fallen to Nightmare, Blight of the
+  Grizzlemaw, Druid of the Flame, Moonspirit, the Lunarwing, Sentinel and Kul Tiran forms, the
+  Darkspear Bat, the Runestags and Ardenmoths, Dreaming Nae'dra, the Somnowls and the Tree of Life.
+
+> These are retail's own form models, converted with their animations and effects. The
+> Incarnation of Nightmare cat still lacks its particles.
 
 ## License
 
