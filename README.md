@@ -100,9 +100,10 @@ uses (Reforged has 9511 and 9571) move past the 9500 block, to 9590 and 9591. Th
 README has more on HD creature packs.
 
 The models keep their retail effects: particles, ribbons and glows (`"effects": true` in
-[`pack.json`](pack.json), an option of the converter). 33 looks colour their particles from their
-display, so the patch also ships `ParticleColor.dbc` with those 33 rows added. A patch after this one
-that ships `ParticleColor.dbc` must be built on this patch's copy, or those looks lose their colours.
+[`pack.json`](pack.json), an option of the converter). 37 looks colour their particles from their
+display, so the patch also ships `ParticleColor.dbc` with the 33 retail rows they use added. A
+patch after this one that ships `ParticleColor.dbc` must be built on this patch's copy, or those
+looks lose their colours.
 
 The build rewrites `data/sql/db-world/mod_retail_druid_forms.sql` to match the patch: commit it with the
 patch you ship. Ids: CreatureDisplayInfo 95000+, CreatureModelData 9500+, preview creatures in
