@@ -100,10 +100,10 @@ uses (Reforged has 9511 and 9571) move past the 9500 block, to 9590 and 9591. Th
 README has more on HD creature packs.
 
 The models keep their retail effects: particles, ribbons and glows (`"effects": true` in
-[`pack.json`](pack.json), an option of the converter). 37 looks colour their particles from their
-display, so the patch also ships `ParticleColor.dbc` with the 33 retail rows they use added. A
-patch after this one that ships `ParticleColor.dbc` must be built on this patch's copy, or those
-looks lose their colours.
+[`pack.json`](pack.json), an option of the converter). 37 looks get their retail particle colours
+(the 34 with emitters use them; Incarnation of Nightmare's emitters stay out), so the patch also
+ships `ParticleColor.dbc` with the 33 retail rows they name added. A patch after this one that
+ships `ParticleColor.dbc` must be built on this patch's copy, or those looks lose their colours.
 
 The build rewrites `data/sql/db-world/mod_retail_druid_forms.sql` to match the patch: commit it with the
 patch you ship. Ids: CreatureDisplayInfo 95000+, CreatureModelData 9500+, preview creatures in
@@ -149,10 +149,11 @@ Category: Classes / Druid
   new batch, from the Zandalari forms in Zul'Gurub to the Batbear in the Ruby Sanctum.
 - Previews show each look; locked ones show as a silhouette and tell you where they unlock.
 
-- The forms keep their particle effects and glows: Fangs of Ashamane, Ghost of the Pridemother,
-  Nature's Fury, Primal Stalker, Stonepaw, Avatar of Ursol, Fallen to Nightmare, Blight of the
-  Grizzlemaw, Druid of the Flame, Moonspirit, the Lunarwing, Sentinel and Kul Tiran forms, the
-  Darkspear Bat, the Runestags and Ardenmoths, Dreaming Nae'dra, the Somnowls and the Tree of Life.
+- Many forms now have their particle effects and glows: Fangs of Ashamane, Ghost of the
+  Pridemother, Nature's Fury, Primal Stalker, Stonepaw, Avatar of Ursol, Fallen to Nightmare,
+  Blight of the Grizzlemaw, Druid of the Flame, Moonspirit, the Lunarwing and Sentinel forms, the
+  Kul Tiran bear, cat, flyer, moonkin and sea creature, the Darkspear Bat, the Runestags and
+  Ardenmoths, Dreaming Nae'dra and the Tree of Life.
 
 > These are retail's own form models, converted with their animations and effects. The
 > Incarnation of Nightmare cat still lacks its particles.
