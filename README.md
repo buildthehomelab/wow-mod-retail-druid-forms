@@ -105,8 +105,17 @@ The models keep their retail effects: particles, ribbons and glows (`"effects": 
 ships `ParticleColor.dbc` with the 33 retail rows they name added. A patch after this one that
 ships `ParticleColor.dbc` must be built on this patch's copy, or those looks lose their colours.
 
+Each look also sounds like its retail form (`"sounds"` in `pack.json`): its attack, wound, death,
+aggro and wing sounds are retail's, as `.ogg` files in the patch (the 3.3.5 client plays them).
+The 265 looks use 61 retail sound sets. So the patch also ships `SoundEntries.dbc` and
+`CreatureSoundData.dbc`, and `--dbc` needs the client's copies of those two (Reforged's
+`patch-P.mpq` has `SoundEntries.dbc`; `CreatureSoundData.dbc` is stock). A patch after this one
+that ships `SoundEntries.dbc` must be built on this patch's copy, or the forms go back to the
+stock creature's sounds. Footsteps stay the stock creature's.
+
 The build rewrites `data/sql/db-world/mod_retail_druid_forms.sql` to match the patch: commit it with the
-patch you ship. Ids: CreatureDisplayInfo 95000+, CreatureModelData 9500+, preview creatures in
+patch you ship. Ids: CreatureDisplayInfo 95000+, CreatureModelData 9500+, CreatureSoundData 9500+, SoundEntries
+992000+, preview creatures in
 9501000-9501499 (subname `Druid Form`), `pack.json` has them all.
 
 Nothing from Blizzard is stored in this repo; the files come from wago.tools at build time.
@@ -154,6 +163,9 @@ Category: Classes / Druid
   Blight of the Grizzlemaw, Druid of the Flame, Moonspirit, the Lunarwing and Sentinel forms, the
   Kul Tiran bear, cat, flyer, moonkin and sea creature, the Darkspear Bat, the Runestags and
   Ardenmoths, Dreaming Nae'dra and the Tree of Life.
+- Every form look now has its retail sounds: the bears roar like retail's bears, the Dreamsaber,
+  Moonspirit and Ghost of the Pridemother cats each have their own voice, and moonkin, flyers,
+  stags and sea creatures sound like their retail forms.
 
 > These are retail's own form models, converted with their animations and effects. The
 > Incarnation of Nightmare cat still lacks its particles.
