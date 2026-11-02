@@ -1,6 +1,6 @@
 # mod-retail-druid-forms
 
-Retail World of Warcraft's druid form looks for a 3.3.5a realm: 265 looks across bear, cat, travel,
+Retail World of Warcraft's druid form looks for a 3.3.5a realm: 269 looks across bear, cat, travel,
 aquatic, flight, moonkin and Tree of Life, picked in the Forms tab of the Transmogrify window.
 
 It is a look pack for [wow-mod-transmog-plus](https://github.com/buildthehomelab/wow-mod-transmog-plus),
@@ -23,7 +23,7 @@ the Haranir forms in each skin colour.
 | Form | Looks | Examples |
 | --- | --- | --- |
 | Bear | 71 | race colours, Claws of Ursoc, Fallen to Nightmare, Bristlebruin, Umbraclaw, Runebear |
-| Cat | 68 | race colours, Fangs of Ashamane, Moonspirit, Druid of the Flame, Dreamsaber |
+| Cat | 72 | race colours, Fangs of Ashamane, Moonspirit, Druid of the Flame, Dreamsaber, Claws of Shirvallah |
 | Moonkin | 44 | race moonkin, Kul Tiran, Haranir, Batbear |
 | Flight | 36 | Storm Crow, Sentinel, Lunarwing, Dredbats, Ravens, Somnowls, Ardenmoths |
 | Travel | 25 | stags, Cheetah, Moose, Raptor, Gladehart, Runestag, Dreamtalon |
@@ -39,7 +39,7 @@ classic looks are free; each phase after that unlocks a themed batch:
 | 1 Molten Core | Stonepaw, Druid of the Flame, Anu'relos |
 | 2 Onyxia | Darkspear (troll) bear, cat and bat |
 | 3 Blackwing Lair | Gilnean (worgen) bear, cat, crow and Doe |
-| 4 Zul'Gurub | all Zandalari forms |
+| 4 Zul'Gurub | all Zandalari forms, Claws of Shirvallah |
 | 5 AQ War Effort | Guardian of the Glade, Moonspirit, Sentinel owls |
 | 6 Ahn'Qiraj | Avatar of Ursol, Nature's Fury, Dolphin |
 | 7 Naxxramas | Fallen to Nightmare, Incarnation of Nightmare, Dredbats, Ravens |
@@ -120,6 +120,36 @@ patch you ship. Ids: CreatureDisplayInfo 95000+, CreatureModelData 9500+, Creatu
 
 Nothing from Blizzard is stored in this repo; the files come from wago.tools at build time.
 
+## Claws of Shirvallah
+
+Warlords of Draenor's Feral talent is four more cat looks, a Saberon in lion, panther, snow leopard
+or tiger colours. Retail's barber shop doesn't offer them, so they are a pack of their own in
+[`shirvallah/`](shirvallah), with their own SQL and id blocks, and `inventory.py` leaves them alone.
+
+The client's archive table is full, so the pack has no patch of its own: it goes into
+`patch-z88-weather.MPQ`, the last patch that ships these tables. Build it, then add it to the live z88:
+
+```bash
+python3 ../mod-retail-creatures/tools/build_patch.py --pack shirvallah --dbc <dbc dir> --cache ~/retail-cache --work ~/mod_retail_shirvallah-work --out shirvallah.MPQ --sql data/sql/db-world/mod_retail_druid_forms_shirvallah.sql
+```
+
+```bash
+python3 <wow-server>/tools/client-patches/respin_patch.py --patch <live patch-z88-weather.MPQ> --files-from shirvallah.MPQ --out patch-z88-weather.MPQ
+```
+
+`--dbc` takes `CreatureDisplayInfo.dbc`, `CreatureModelData.dbc` and `ParticleColor.dbc` from `z75`,
+`CreatureSoundData.dbc` from `z76`, `SoundEntries.dbc` from `z88` (the pack's own rows in it are replaced)
+and the client's `AnimationData.dbc`.
+wow-server's `tools/client-patches/README.md` says when it has to be rebuilt.
+
+Retail played the form's on-all-fours animations (`MountSelf`) through an AnimReplacementSet with run
+time conditions. The 3.3.5 client has neither, so `anim_replace` in `pack.json` puts them in the model:
+the form stands, walks, runs and jumps on all fours, and is upright when ready to fight and for its
+attacks. The attacks use retail's own swaps from that set.
+
+Ids: CreatureDisplayInfo 95900-95903, CreatureModelData 95900, CreatureSoundData 13000, SoundEntries
+1020000+, preview creatures 9505000-9505003.
+
 ## Uninstalling
 
 Remove the module folder, rebuild, and run `data/sql/uninstall/mod_retail_druid_forms_uninstall.sql` by hand.
@@ -151,7 +181,7 @@ Players can keep the patch: unused displays do nothing.
 
 Category: Classes / Druid
 
-- Druids can now choose from 265 looks for their shapeshift forms, from the new Forms tab of the
+- Druids can now choose from 269 looks for their shapeshift forms, from the new Forms tab of the
   Transmogrify window (`/transmog`).
 - Every form has looks: bear, cat, travel, aquatic, flight, moonkin and Tree of Life.
 - The classic looks, remade in HD, are yours from the start. Every raid tier you clear unlocks a
@@ -166,6 +196,9 @@ Category: Classes / Druid
 - Every form look now has its retail sounds: the bears roar like retail's bears, the Dreamsaber,
   Moonspirit and Ghost of the Pridemother cats each have their own voice, and moonkin, flyers,
   stags and sea creatures sound like their retail forms.
+
+- **Claws of Shirvallah** is back: the Saberon cat form from Warlords of Draenor, as a lion, panther,
+  snow leopard or tiger, unlocks with Zul'Gurub. It runs on all fours and rears up to fight.
 
 > These are retail's own form models, converted with their animations and effects. The
 > Incarnation of Nightmare cat still lacks its particles.
