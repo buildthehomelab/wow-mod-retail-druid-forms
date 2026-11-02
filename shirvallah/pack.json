@@ -1,0 +1,21 @@
+{
+  "looks": "looks.tsv",
+  "root": "Creature\\RetailForms",
+  "first_display": 95900,
+  "first_model": 95900,
+  "preview_base": 9505000,
+  "subname": "Druid Form",
+  "sort_base": 265,
+  "prune_textures": false,
+  "effects": true,
+  "sounds": {"first_entry": 1020000, "first_data": 13000, "replace_own": true},
+  "template": {"cat": 892},
+  "anim_replace": {"saberon": {
+    "0": 618, "4": 620, "5": 622, "143": 624, "11": 630, "12": 632, "13": 634,
+    "38": 638, "37": 640, "39": 642, "187": 644,
+    "174": 17, "172": 87, "170": 88, "171": 118, "173": 212,
+    "18": null, "19": null, "85": null, "86": null,
+    "26": null, "27": null, "28": null, "89": null
+  }},
+  "source": "buildthehomelab/wow-mod-retail-druid-forms shirvallah/looks.tsv. The display ids are in patch-z88-weather.MPQ."
+}
