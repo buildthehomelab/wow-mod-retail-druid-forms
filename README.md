@@ -142,10 +142,11 @@ python3 <wow-server>/tools/client-patches/respin_patch.py --patch <live patch-z8
 and the client's `AnimationData.dbc`.
 wow-server's `tools/client-patches/README.md` says when it has to be rebuilt.
 
-Retail played the form's on-all-fours animations (`MountSelf`) through an AnimReplacementSet with run
-time conditions. The 3.3.5 client has neither, so `anim_replace` in `pack.json` puts them in the model:
-the form stands, walks, runs and jumps on all fours, and is upright when ready to fight and for its
-attacks. The attacks use retail's own swaps from that set.
+Retail played the form's attacks through an AnimReplacementSet with run time conditions, which the 3.3.5
+client lacks, so `anim_replace` in `pack.json` puts those swaps in the model. That set also has on-all-fours
+animations (`MountSelf`) for standing and moving; the pack leaves them out, because the run looked wrong in
+game, so the form stands and moves upright, apart from one occasional idle and the crouch when it lands. The
+model has no backpedal, so the client plays Walk for it.
 
 Ids: CreatureDisplayInfo 95900-95903, CreatureModelData 95900, CreatureSoundData 13000, SoundEntries
 1020000+, preview creatures 9505000-9505003.
@@ -198,7 +199,7 @@ Category: Classes / Druid
   stags and sea creatures sound like their retail forms.
 
 - **Claws of Shirvallah** is back: the Saberon cat form from Warlords of Draenor, as a lion, panther,
-  snow leopard or tiger, unlocks with Zul'Gurub. It runs on all fours and rears up to fight.
+  snow leopard or tiger, unlocks with Zul'Gurub.
 
 > These are retail's own form models, converted with their animations and effects. The
 > Incarnation of Nightmare cat still lacks its particles.
